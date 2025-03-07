@@ -2,7 +2,7 @@
 
 A simple [Dictionary Server Protocol](https://datatracker.ietf.org/doc/html/rfc2229) client rust implementation
 
-## Exmaples 
+## Examples
 
 ```rust
 use dict_client::Command;
