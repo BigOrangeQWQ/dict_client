@@ -1,0 +1,10 @@
+[package]
+name = "dict_client"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A simple dictionary server protocol client implementation"
+authors = ["BigOrangeQWQ <2284086963@qq.com>"]
+repository = "https://github.com/bigorangeqwq/dict-client"
+
+[dependencies]

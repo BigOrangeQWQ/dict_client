@@ -1,0 +1,4 @@
+[workspace]
+members = ["dict_client", "example"]
+resolver = "2"
+
