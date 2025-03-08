@@ -9,3 +9,9 @@ repository = "https://github.com/bigorangeqwq/dict-client"
 readme = "../README.md"
 
 [dependencies]
+tokio = {version ="1.44.0", features = ["net", "io-util"], optional = true}
+
+[features]
+default = []
+async = ["tokio"]
+full = ["async"]

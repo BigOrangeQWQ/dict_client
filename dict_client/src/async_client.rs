@@ -1,59 +1,61 @@
-use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
-    net::{TcpStream, ToSocketAddrs},
-};
+#![cfg(feature = "async")]
+
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
+use tokio::io::BufWriter;
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::net::tcp::OwnedWriteHalf;
+use tokio::net::TcpStream;
+use tokio::net::ToSocketAddrs;
 
 use crate::{
     cmd::Command,
     response::{Response, StatusCode},
 };
 
-pub struct DictClient {
-    stream: TcpStream,
-    pub writer: BufWriter<TcpStream>,
-    pub reader: BufReader<TcpStream>,
+pub struct AsyncDClient {
+    pub reader: BufReader<OwnedReadHalf>,
+    pub writer: BufWriter<OwnedWriteHalf>,
     pub header: String,
 }
 
-impl DictClient {
-    pub fn new(stream: TcpStream) -> Self {
-        let mut reader = BufReader::new(stream.try_clone().unwrap());
-        let writer = BufWriter::new(stream.try_clone().unwrap());
+impl AsyncDClient {
+    pub async fn new(stream: TcpStream) -> Self {
+        let (read_half, write_half) = stream.into_split();
+        let mut reader = BufReader::new(read_half);
+        let writer = BufWriter::new(write_half);
+
         let mut header = String::new();
-        let _ = reader.read_line(&mut header);
+        let _ = reader.read_line(&mut header).await;
 
-        DictClient {
-            stream,
-            writer,
-            reader,
-            header,
-        }
+        AsyncDClient { reader, writer, header }
     }
 
-    pub fn connect<T: ToSocketAddrs>(addr: T) -> Self {
-        let stream = TcpStream::connect(addr).unwrap();
-        DictClient::new(stream)
+    pub async fn connect<T: ToSocketAddrs>(addr: T) -> Self {
+        let stream = TcpStream::connect(addr).await.unwrap();
+        AsyncDClient::new(stream).await
     }
 
-    pub(crate) fn send_str(&mut self, data: &str) {
-        self.send_bytes(data.as_bytes());
+    pub(crate) async fn send_str(&mut self, data: &str) {
+        self.send_bytes(data.as_bytes()).await;
     }
 
-    pub(crate) fn send_bytes(&mut self, data: &[u8]) {
-        let _ = self.stream.write(data);
-        let _ = self.stream.flush();
+    pub(crate) async fn send_bytes(&mut self, data: &[u8]) {
+        let _ = self.writer.write(data).await;
+        let _ = self.writer.flush().await;
     }
 
     /// Write a command to the server.
-    pub fn send_cmd(&mut self, command: Command) {
+    pub async fn send_cmd(&mut self, command: Command) {
         let message = command.to_message();
-        self.send_str(&message);
+        self.send_str(&message).await;
     }
 
     /// Read a response from the server.
-    pub fn read_resp(&mut self) -> Option<Response> {
+    pub async fn read_resp(&mut self) -> Option<Response> {
         let mut line = String::new();
-        let mut resp: Option<Response> = if let Ok(v) = self.reader.read_line(&mut line) {
+        let mut resp: Option<Response> = if let Ok(v) = self.reader.read_line(&mut line).await {
             if v != 0 {
                 Some(Response::from_line(&line))
             } else {
@@ -74,7 +76,7 @@ impl DictClient {
                 for _ in 0..resp.count() {
                     loop {
                         let mut line = String::new();
-                        let _ = self.reader.read_line(&mut line);
+                        let _ = self.reader.read_line(&mut line).await;
                         if line.trim() == "." {
                             break;
                         }
@@ -85,7 +87,7 @@ impl DictClient {
             } else if resp.is_multple_data() {
                 loop {
                     let mut line = String::new();
-                    let _ = self.reader.read_line(&mut line);
+                    let _ = self.reader.read_line(&mut line).await;
                     if line.trim() == "." {
                         break;
                     }
@@ -100,8 +102,8 @@ impl DictClient {
     }
 
     /// Send a command to the server and read the response.
-    pub fn command(&mut self, command: Command) -> Option<Response> {
-        self.send_cmd(command);
-        self.read_resp()
+    pub async fn command(&mut self, command: Command) -> Option<Response> {
+        self.send_cmd(command).await;
+        self.read_resp().await
     }
 }
